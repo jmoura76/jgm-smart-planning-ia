@@ -224,9 +224,13 @@ st.markdown("---")
 # ============================
 # ABAS PRINCIPAIS
 # ============================
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📋 Ordens & Dados Brutos", "🏭 Máquinas & Performance", "🧠 Alocação Inteligente", "📡 Simulação MES"]
-)
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📋 Ordens & Dados Brutos",
+    "🏭 Máquinas & Performance",
+    "🧠 Alocação Inteligente",
+    "📡 Simulação MES",
+    "📦 Demanda EDI – Centro 3101"
+])
 
 # ----------------------------
 # ABA 1 – ORDENS & DADOS BRUTOS
@@ -397,3 +401,109 @@ with tab4:
 
     else:
         st.info("Clique no botão acima para rodar a simulação de execução no MES (Manit).")
+
+# ----------------------------
+# ABA 5 – DEMANDA EDI – CENTRO 3101
+# ----------------------------
+with tab5:
+    st.subheader("📦 Demanda EDI – Centro 3101")
+    st.write("Carregue o arquivo Excel exportado do SAP contendo as necessidades diárias dos produtos (PPDS).")
+
+    up_edi = st.file_uploader("📤 Enviar arquivo EDI (Excel, XLSX)", type=["xlsx"])
+
+    if up_edi is None:
+        st.info("Aguardando upload do arquivo **EXPORT_EDI_PRODUTOS.XLSX**…")
+        st.stop()
+
+    # Leitura do Excel
+    try:
+        df_edi_raw = pd.read_excel(up_edi)
+        st.success("Arquivo EDI carregado com sucesso.")
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo Excel: {e}")
+        st.stop()
+
+    st.markdown("### 🔧 Normalizando dados do EDI…")
+
+    # Normaliza as colunas, independentemente do nome
+    col_map = {
+        "Data final": "demand_date",
+        "Quantidade entrada/necessária": "qty",
+        "Nº do produto": "material",
+        "Denominação do produto": "material_desc",
+        "Unidade gerencial": "plant",
+        "Recurso": "work_center_sap"
+    }
+
+    df_edi = pd.DataFrame()
+    for original, novo in col_map.items():
+        if original in df_edi_raw.columns:
+            df_edi[novo] = df_edi_raw[original]
+        else:
+            df_edi[novo] = None
+
+    # Convertendo tipos
+    df_edi["qty"] = pd.to_numeric(df_edi["qty"], errors="coerce").fillna(0.0)
+    df_edi["demand_date"] = pd.to_datetime(df_edi["demand_date"], errors="coerce")
+    df_edi = df_edi.dropna(subset=["demand_date"])  # remove linhas sem data
+
+    # Filtrar planta 3101
+    df_edi = df_edi[df_edi["plant"].astype(str).str.contains("3101", na=False)]
+
+    # KPIs
+    total_demand = df_edi["qty"].sum()
+    num_products = df_edi["material"].nunique()
+
+    demand_per_day = df_edi.groupby("demand_date")["qty"].sum()
+    peak_day = demand_per_day.idxmax()
+    peak_value = demand_per_day.max()
+
+    st.markdown("### 📊 KPIs da Demanda EDI (Centro 3101)")
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Volume total (peças)", f"{int(total_demand):,}".replace(",", "."))
+    k2.metric("Produtos distintos", num_products)
+    k3.metric("Pico de demanda (dia)", peak_day.strftime("%d/%m/%Y"))
+    k4.metric("Demanda do pico (peças)", f"{int(peak_value):,}".replace(",", "."))
+
+    # Tabela resumida
+    st.markdown("### 📋 Tabela de demanda diária por produto")
+    df_table = df_edi[["demand_date", "material", "material_desc", "qty", "work_center_sap"]]
+    st.dataframe(df_table, use_container_width=True)
+
+    # Gráfico 1 – Demanda por dia
+    st.markdown("### 📈 Demanda total por dia")
+    fig1 = go.Figure()
+    fig1.add_trace(go.Bar(
+        x=demand_per_day.index,
+        y=demand_per_day.values,
+        marker=dict(color="rgba(0, 98, 204, 0.85)"),
+        name="Demanda"
+    ))
+    fig1.update_layout(
+        template="plotly_white",
+        xaxis_title="Data",
+        yaxis_title="Peças",
+        height=400
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # Gráfico 2 – Top 10 Produtos
+    st.markdown("### 📊 Top 10 Produtos por Demanda")
+    top10 = df_edi.groupby("material")["qty"].sum().sort_values(ascending=False).head(10)
+
+    fig2 = go.Figure()
+    fig2.add_trace(go.Bar(
+        y=top10.index.astype(str),
+        x=top10.values,
+        orientation="h",
+        marker=dict(color="rgba(255, 132, 35, 0.85)")
+    ))
+    fig2.update_layout(
+        template="plotly_white",
+        xaxis_title="Peças",
+        yaxis_title="Produto",
+        height=450
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+
