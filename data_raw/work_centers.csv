@@ -1,0 +1,4 @@
+work_center_sap,descricao,capacidade_teorica,oee_historico,velocidade_media,confiabilidade
+CT01,Prensa Airbag Linha 1,1000,0.88,95,0.90
+CT02,Prensa Airbag Linha 2,1000,0.92,90,0.85
+CT03,Montagem Volante Linha 1,800,0.80,110,0.95

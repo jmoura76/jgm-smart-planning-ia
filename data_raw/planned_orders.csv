@@ -1,0 +1,4 @@
+order_id,material,material_desc,qty,work_center_sap,mrp_controller,due_date
+100001,ST-001,Base Volante Airbag,500,CT01,PP1,2025-11-20
+100002,ST-002,Miolo Volante Airbag,300,CT02,PP1,2025-11-21
+100003,ST-003,Capa Airbag Lado Esq,400,CT03,PP1,2025-11-22
